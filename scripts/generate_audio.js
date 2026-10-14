@@ -41,14 +41,15 @@ function loadEnv() {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function fetchWithRetry(url, options, maxRetries = 3) {
+async function fetchWithRetry(url, options, maxRetries = 5) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const res = await fetch(url, options);
       if (res.status === 429) {
-        const waitTime = attempt * 2000;
-        console.log(`[Rate Limit 429, waiting ${waitTime}ms]...`);
+        const waitTime = Math.min(attempt * 3000, 15000);
+        console.log(`[Rate Limit 429, waiting ${waitTime}ms (attempt ${attempt}/${maxRetries})]...`);
         await sleep(waitTime);
+        if (attempt === maxRetries) throw new Error('429 Rate limit exceeded after retries');
         continue;
       }
       if (!res.ok) {
@@ -61,11 +62,12 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
       await sleep(attempt * 1000);
     }
   }
+  throw new Error('Failed after max retries');
 }
 
 async function main() {
   loadEnv();
-  const apiKey = process.env.VITE_ELEVENLABS_API_KEY || 'sk_0c5e246cde240b3dbea2308d7b36d8923d724820eaaf8bd8';
+  const apiKey = process.env.VITE_ELEVENLABS_API_KEY;
   if (!apiKey) {
     console.error('✖ Missing VITE_ELEVENLABS_API_KEY in .env.local');
     process.exit(1);
